@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orb</title>
+<style>html,body{margin:0;height:100%;background:#05080f;overflow:hidden}canvas{display:block}</style>
+</head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 100);
+cam.position.z = 4;
+const r = new THREE.WebGLRenderer({ antialias: true });
+r.setSize(innerWidth, innerHeight);
+r.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(r.domElement);
+const core = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(1.2, 3),
+  new THREE.MeshBasicMaterial({ color: 0x2288ff, transparent: true, opacity: 0.35 })
+);
+const wire = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(1.5, 2),
+  new THREE.MeshBasicMaterial({ color: 0x77ddff, wireframe: true })
+);
+scene.add(core, wire);
+let level = 0, target = 0;
+function setLevel(v) { target = v; }
+function setMode(t) {
+  wire.material.color.setHex(t ? 0xffaa33 : 0x77ddff);
+  core.material.color.setHex(t ? 0xcc6600 : 0x2288ff);
+}
+addEventListener("resize", function () {
+  cam.aspect = innerWidth / innerHeight;
+  cam.updateProjectionMatrix();
+  r.setSize(innerWidth, innerHeight);
+});
+function loop() {
+  requestAnimationFrame(loop);
+  level += (target - level) * 0.2;
+  core.scale.setScalar(1 + level * 0.06);
+  wire.scale.setScalar(1 + level * 0.03);
+  wire.rotation.y += 0.006 + level * 0.004;
+  wire.rotation.x += 0.003;
+  core.rotation.y -= 0.004;
+  r.render(scene, cam);
+}
+loop();
+</script>
+</body>
+</html>

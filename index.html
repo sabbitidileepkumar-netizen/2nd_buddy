@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Buddy</title>
+<style>
+body{margin:0;height:100vh;background:#05080f;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:sans-serif;color:#9cf}
+#ball{width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,#7df,#06c);box-shadow:0 0 60px #0af;transition:transform .08s}
+#ball.talk{background:radial-gradient(circle,#fd8,#c60);box-shadow:0 0 60px #f90}
+#txt{margin:60px 20px 0;text-align:center;min-height:60px;font-size:18px}
+button{margin-top:30px;padding:14px 28px;border:0;border-radius:30px;background:#0af;color:#000;font-size:18px}
+</style>
+</head>
+<body>
+<div id="ball"></div>
+<div id="txt"></div>
+<button id="btn">Tap to start</button>
+<script>
+let speaking=false,busy=false,awake=false,rec;
+const get=k=>{try{return JSON.parse(localStorage.getItem(k)||"[]")}catch(e){return[]}};
+const put=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+btn.onclick=async()=>{
+ if(!localStorage.getItem("pin")){
+  const p=prompt("Enter your secret code");
+  if(!p)return;
+  localStorage.setItem("pin",p);
+ }
+ const s=await navigator.mediaDevices.getUserMedia({audio:true});
+ const c=new AudioContext(),a=c.createAnalyser(),d=new Uint8Array(a.fftSize);
+ c.createMediaStreamSource(s).connect(a);
+ btn.style.display="none";
+ (function loop(){
+  a.getByteTimeDomainData(d);
+  let m=0;for(const v of d)m=Math.max(m,Math.abs(v-128));
+  if(speaking)m=10+Math.random()*25;
+  ball.style.transform="scale("+(1+m/40)+")";
+  requestAnimationFrame(loop);
+ })();
+ setup();
+};
+function start(){try{rec.start()}catch(e){}}
+function setup(){
+ const R=window.SpeechRecognition||window.webkitSpeechRecognition;
+ rec=new R();rec.lang="en-IN";
+ rec.onresult=async e=>{
+  const heard=e.results[0][0].transcript;
+  const low=heard.toLowerCase();
+  if(!awake){
+   if(/(buddy|buddi).*(wake|walk|wait|weak) ?up/.test(low)){
+    awake=true;busy=true;
+    txt.textContent="I'm awake!";
+    speak("I'm awake. How can I help?");
+   }
+   return;
+  }
+  if(/go to sleep|sleep now|good night/.test(low)){
+   awake=false;busy=true;
+   txt.textContent="Sleeping...";
+   speak("Okay, going to sleep.");
+   return;
+  }
+  busy=true;
+  const q=heard;
+  txt.textContent="You: "+q;
+  try{
+   const his=get("his");
+   const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json","x-pin":localStorage.getItem("pin")},body:JSON.stringify({q:q,history:his.slice(-6)})});
+   if(r.status==401){
+    localStorage.removeItem("pin");
+    txt.textContent="Wrong code. Refresh the page and try again.";
+    busy=false;
+    return;
+   }
+   const j=await r.json();
+   his.push("User: "+q,"Buddy: "+j.reply);put("his",his.slice(-20));
+   txt.textContent=j.reply;
+   speak(j.reply);
+  }catch(err){busy=false;start();}
+ };
+ rec.onend=()=>{if(!busy)setTimeout(start,300)};
+ start();
+}
+function speak(t){
+ speaking=true;ball.classList.add("talk");
+ const u=new SpeechSynthesisUtterance(t);
+ u.onend=()=>{speaking=false;busy=false;ball.classList.remove("talk");start()};
+ speechSynthesis.speak(u);
+}
+</script>
+</body>
+</html>
